@@ -65,7 +65,37 @@ Your conversations are never stored on a central server. Messages are encrypted 
       |<---------- 10. Encrypted Chat (AES-GCM) ------->|
       |                                                  |
 ```
-      
+
+## Application flow
+
+1.  **Authentication (Web3 Login)**
+    * **Connect:** The user visits the landing page and opens the login modal. They use `ethers.js` to connect their browser wallet (e.g., MetaMask).
+    * **Sign:** The app generates a "Sign-In with Ethereum" (SIWE) message (e.g., "Sign in to... prove you own this wallet"). The user signs this message (a free, gas-less action) to prove ownership.
+    * **Verify:** The app verifies the signature. On success, the user is prompted to enter a display name.
+
+2.  **Signaling (Finding Peers)**
+    * **Server Connect:** After authentication, the client opens a secure WebSocket (`wss://`) connection to the signaling server (running on port 3001).
+    * **Join Room:** The client sends a `join` message to the server with its chosen room ID (e.g., "general") and display name.
+    * **Peer Discovery:** The server responds with a `room-joined` message, which includes a list of all *other* users already in that room. It also sends a `user-joined` message to all existing users to notify them of the new arrival.
+
+3.  **P2P Connection (WebRTC Handshake)**
+    * **Offer/Answer:** For *each* peer in the room, the client negotiates a direct P2P connection. This involves using the signaling server to relay "offers," "answers," and "ICE candidates" back and forth.
+    * **Channel Established:** Once negotiated, a direct `RTCDataChannel` is created between the two clients. This connection forms a "mesh" (everyone is connected to everyone else), and the signaling server is no longer involved in their communication.
+
+4.  **End-to-End Encryption (E2E)**
+    * **Generate Keys:** As soon as the P2P channel opens, both clients independently generate an **ECDH** (Elliptic-curve Diffie–Hellman) key pair.
+    * **Exchange Public Keys:** They send their *public key* to each other over the newly established P2P channel.
+    * **Derive Shared Secret:** Each client uses its *own private key* and the *peer's public key* to mathematically derive an identical **AES-GCM** shared secret key. This key is unique for this specific peer-to-peer link and was never transmitted.
+
+5.  **Secure Communication (Chat & File Sharing)**
+    * **Sending Messages:** When a user sends a message, the app encrypts it with the AES-GCM shared secret and sends the encrypted data directly to the peer over the P2P channel.
+    * **Receiving Messages:** The peer's client receives the encrypted data, decrypts it using the same shared secret, and displays the original message.
+    * **File Sharing:** Files are handled similarly. The file is broken into 16KB chunks, a **SHA-256 hash** is calculated (for integrity), and each chunk is individually encrypted and sent. The receiver reassembles the chunks and verifies the hash to ensure the file is not corrupt.
+    * **Reactions:** Emoji reactions are sent as simple messages over the P2P channel, referencing the ID of the message being reacted to.
+
+6.  **Disconnecting**
+    * **Leave:** When a user leaves, the signaling server is notified, which then broadcasts a `user-left` message so all other clients can close their P2P connection to that specific user.
+    * **Close:** When the user closes the app, all WebSocket and P2P connections are terminated.
 
 ## Setup and Installation
 
