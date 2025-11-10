@@ -29,7 +29,7 @@ Your conversations are never stored on a central server. Messages are encrypted 
 | **Server** | Node.js, `ws` (WebSocket) | Signaling server for WebRTC handshakes |
 | **HTTPS** | `mkcert` (local) | Required for WebRTC and Web Crypto APIs |
 
-##Architecture diagram
+## Architecture diagram
 
 ```
   [ Client A ]                                       [ Client B ]
