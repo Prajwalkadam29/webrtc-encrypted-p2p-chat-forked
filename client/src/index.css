@@ -3,16 +3,35 @@
 @tailwind utilities;
 
 @layer base {
+  html {
+    @apply scroll-smooth scroll-pt-20;
+  }
+  
   body {
-    @apply bg-vscode-dark min-h-screen overflow-hidden;
+    @apply bg-white dark:bg-vscode-dark min-h-screen transition-colors duration-300;
     font-family: 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
 }
 
+@layer utilities {
+  .bg-gradient-radial {
+    background-image: radial-gradient(ellipse at top, rgba(30, 30, 30, 0.6) 0%, rgba(30, 30, 30, 0.9) 100%);
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
 @layer components {
-  /* VSCode Dark Theme */
+  /* VSCode Dark Theme Colors */
   .bg-vscode-dark {
     background-color: #1e1e1e;
   }
@@ -145,6 +164,20 @@
   
   .custom-scrollbar::-webkit-scrollbar-thumb:hover {
     background: #4e4e52;
+  }
+  
+  /* Light mode scrollbar */
+  .custom-scrollbar:not(.dark)::-webkit-scrollbar-track {
+    background: #f5f5f5;
+  }
+  
+  .custom-scrollbar:not(.dark)::-webkit-scrollbar-thumb {
+    background: #d1d1d1;
+    border: 2px solid #f5f5f5;
+  }
+  
+  .custom-scrollbar:not(.dark)::-webkit-scrollbar-thumb:hover {
+    background: #b1b1b1;
   }
   
   /* Status indicators */

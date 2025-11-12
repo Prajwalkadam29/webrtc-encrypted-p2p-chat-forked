@@ -474,11 +474,11 @@ function App() {
         const cryptoUtils = new CryptoUtils();
         await cryptoUtils.generateKeyPair();
         setCrypto(cryptoUtils);
-        addSystemMessage('🔐 Encryption keys generated', currentRoomIdRef.current);
+        // addSystemMessage('Encryption keys generated', currentRoomIdRef.current);
         
-        addSystemMessage('🌐 Connecting to server...', currentRoomIdRef.current);
+        // addSystemMessage(' Connecting to server...', currentRoomIdRef.current);
         await webrtcManager.connectToSignalingServer();
-        addSystemMessage('✅ Connected to server', currentRoomIdRef.current);
+        // addSystemMessage(' Connected to server', currentRoomIdRef.current);
         
         webrtcManager.join(displayNameRef.current, currentRoomIdRef.current);
         

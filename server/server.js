@@ -5,17 +5,73 @@ const os = require('os');
 
 const PORT = 3001;
 
-// Get local IP address for display
+// Get local IP address for display - IMPROVED VERSION
 function getLocalIpAddress() {
   const interfaces = os.networkInterfaces();
+  
+  // Priority 1: Look for WiFi adapter by name
+  for (const name of Object.keys(interfaces)) {
+    // Skip known virtual adapters
+    if (name.toLowerCase().includes('virtualbox') || 
+        name.toLowerCase().includes('vmware') || 
+        name.toLowerCase().includes('hyper-v') ||
+        name.toLowerCase().includes('vethernet') ||
+        name.toLowerCase().includes('docker')) {
+      continue;
+    }
+    
+    // Prioritize WiFi adapters
+    if (name.toLowerCase().includes('wi-fi') || 
+        name.toLowerCase().includes('wireless') ||
+        name.toLowerCase().includes('wlan')) {
+      for (const iface of interfaces[name]) {
+        if (iface.family === 'IPv4' && !iface.internal) {
+          console.log(`✅ Using WiFi adapter: ${name} - ${iface.address}`);
+          return iface.address;
+        }
+      }
+    }
+  }
+  
+  // Priority 2: Look for typical home/office IP ranges
+  const wifiPatterns = [
+    /^192\.168\.[01]\./,  // 192.168.0.x or 192.168.1.x
+    /^10\./,              // 10.x.x.x
+    /^172\.(1[6-9]|2[0-9]|3[01])\./  // 172.16-31.x.x
+  ];
+  
+  for (const pattern of wifiPatterns) {
+    for (const name of Object.keys(interfaces)) {
+      // Skip virtual adapters
+      if (name.toLowerCase().includes('virtualbox') || 
+          name.toLowerCase().includes('vmware') || 
+          name.toLowerCase().includes('hyper-v') ||
+          name.toLowerCase().includes('vethernet') ||
+          name.toLowerCase().includes('docker')) {
+        continue;
+      }
+      
+      for (const iface of interfaces[name]) {
+        if (iface.family === 'IPv4' && !iface.internal) {
+          if (pattern.test(iface.address)) {
+            console.log(`✅ Using network IP: ${name} - ${iface.address}`);
+            return iface.address;
+          }
+        }
+      }
+    }
+  }
+  
+  // Fallback: First non-internal IPv4 (if nothing else works)
   for (const name of Object.keys(interfaces)) {
     for (const iface of interfaces[name]) {
-      // Skip internal (loopback) and non-IPv4 addresses
       if (iface.family === 'IPv4' && !iface.internal) {
+        console.log(`⚠️  Using fallback IP: ${name} - ${iface.address}`);
         return iface.address;
       }
     }
   }
+  
   return 'localhost';
 }
 
@@ -33,6 +89,9 @@ const wss = new WebSocket.Server({ server });
 // Store connected clients and rooms
 const clients = new Map();
 const rooms = new Map();
+
+// ... rest of your code stays exactly the same ...
+// (All the wss.on, handleJoin, handleSignal, etc.)
 
 wss.on('connection', (ws) => {
   console.log('✅ New client connected');
@@ -80,7 +139,6 @@ function handleJoin(ws, data) {
   }
   rooms.get(roomId).add(ws);
 
-  // Get existing users in room
   const existingUsers = Array.from(rooms.get(roomId))
     .filter(client => client !== ws)
     .map(client => {
@@ -88,7 +146,6 @@ function handleJoin(ws, data) {
       return { userId: info.userId, username: info.username };
     });
 
-  // Send to new user
   ws.send(JSON.stringify({
     type: 'room-joined',
     roomId,
@@ -96,14 +153,12 @@ function handleJoin(ws, data) {
     users: existingUsers
   }));
 
-  // Notify others
   broadcastToRoom(roomId, {
     type: 'user-joined',
     userId,
     username
   }, ws);
 
-  // Send updated user list
   updateUserList(roomId);
 
   console.log(`👤 ${username} joined room: ${roomId}`);
@@ -115,7 +170,6 @@ function handleSignal(ws, data) {
 
   const { targetId, signal } = data;
 
-  // Find target client
   for (const [client, info] of clients.entries()) {
     if (info.userId === targetId && info.roomId === sender.roomId) {
       client.send(JSON.stringify({
@@ -201,12 +255,10 @@ server.listen(PORT, '0.0.0.0', () => {
 process.on('SIGTERM', () => {
   console.log('\n👋 Shutting down gracefully...');
   
-  // Close all WebSocket connections
   wss.clients.forEach(client => {
     client.close();
   });
   
-  // Close server
   server.close(() => {
     console.log('✅ Server closed');
     process.exit(0);
