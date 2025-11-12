@@ -1,7 +1,7 @@
 # webrtc-encrypted-p2p-chat
 -----
 
-# SecureChat: Web3-Authenticated E2E Encrypted P2P Chat
+# DAuthChat: Web3-Authenticated E2E Encrypted P2P Chat
 
 This project is a decentralized, peer-to-peer (P2P) chat application featuring end-to-end encryption (E2E) and Web3-based authentication using "Sign-In with Ethereum" (SIWE).
 
