@@ -16,12 +16,19 @@ import CryptoUtils from './utils/crypto';
 import FileTransferManager from './utils/fileTransfer';
 import notificationSounds from './utils/notificationSounds';
 
-const getSignalingServerUrl = () => {
-  const hostname = window.location.hostname;
-  return `wss://${hostname}:3001`; // Use wss:// for secure WebSocket
-};
+// const getSignalingServerUrl = () => {
+//   const hostname = window.location.hostname;
+//   return `wss://${hostname}:3001`; // Use wss:// for secure WebSocket
+// };
 
-const SIGNALING_SERVER = getSignalingServerUrl();
+// const SIGNALING_SERVER = getSignalingServerUrl();
+
+
+
+// client/src/app.jsx - NEW CODE
+// Use the production URL from Vercel's environment variables,
+// but fall back to our local server for development.
+const SIGNALING_SERVER = import.meta.env.VITE_WEBSOCKET_URL || 'wss://localhost:3001';
 
 const AVAILABLE_ROOMS = [
   { id: 'general', name: 'general', icon: '🏠', description: 'General chat' },
@@ -474,11 +481,11 @@ function App() {
         const cryptoUtils = new CryptoUtils();
         await cryptoUtils.generateKeyPair();
         setCrypto(cryptoUtils);
-        // addSystemMessage('Encryption keys generated', currentRoomIdRef.current);
+        addSystemMessage('🔐 Encryption keys generated', currentRoomIdRef.current);
         
-        // addSystemMessage(' Connecting to server...', currentRoomIdRef.current);
+        addSystemMessage('🌐 Connecting to server...', currentRoomIdRef.current);
         await webrtcManager.connectToSignalingServer();
-        // addSystemMessage(' Connected to server', currentRoomIdRef.current);
+        addSystemMessage('✅ Connected to server', currentRoomIdRef.current);
         
         webrtcManager.join(displayNameRef.current, currentRoomIdRef.current);
         
