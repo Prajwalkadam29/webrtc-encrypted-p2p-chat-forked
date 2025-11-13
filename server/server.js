@@ -1,97 +1,51 @@
+// server/server.js (REPLACE your entire file with this)
+
+const WebSocket = require('ws');
+const http = require('http');
 const https = require('https');
 const fs = require('fs');
-const WebSocket = require('ws');
 const os = require('os');
 
-const PORT = 3001;
-
-// Get local IP address for display - IMPROVED VERSION
-function getLocalIpAddress() {
-  const interfaces = os.networkInterfaces();
-  
-  // Priority 1: Look for WiFi adapter by name
-  for (const name of Object.keys(interfaces)) {
-    // Skip known virtual adapters
-    if (name.toLowerCase().includes('virtualbox') || 
-        name.toLowerCase().includes('vmware') || 
-        name.toLowerCase().includes('hyper-v') ||
-        name.toLowerCase().includes('vethernet') ||
-        name.toLowerCase().includes('docker')) {
-      continue;
-    }
-    
-    // Prioritize WiFi adapters
-    if (name.toLowerCase().includes('wi-fi') || 
-        name.toLowerCase().includes('wireless') ||
-        name.toLowerCase().includes('wlan')) {
-      for (const iface of interfaces[name]) {
-        if (iface.family === 'IPv4' && !iface.internal) {
-          console.log(`✅ Using WiFi adapter: ${name} - ${iface.address}`);
-          return iface.address;
-        }
-      }
-    }
-  }
-  
-  // Priority 2: Look for typical home/office IP ranges
-  const wifiPatterns = [
-    /^192\.168\.[01]\./,  // 192.168.0.x or 192.168.1.x
-    /^10\./,              // 10.x.x.x
-    /^172\.(1[6-9]|2[0-9]|3[01])\./  // 172.16-31.x.x
-  ];
-  
-  for (const pattern of wifiPatterns) {
-    for (const name of Object.keys(interfaces)) {
-      // Skip virtual adapters
-      if (name.toLowerCase().includes('virtualbox') || 
-          name.toLowerCase().includes('vmware') || 
-          name.toLowerCase().includes('hyper-v') ||
-          name.toLowerCase().includes('vethernet') ||
-          name.toLowerCase().includes('docker')) {
-        continue;
-      }
-      
-      for (const iface of interfaces[name]) {
-        if (iface.family === 'IPv4' && !iface.internal) {
-          if (pattern.test(iface.address)) {
-            console.log(`✅ Using network IP: ${name} - ${iface.address}`);
-            return iface.address;
-          }
-        }
-      }
-    }
-  }
-  
-  // Fallback: First non-internal IPv4 (if nothing else works)
-  for (const name of Object.keys(interfaces)) {
-    for (const iface of interfaces[name]) {
-      if (iface.family === 'IPv4' && !iface.internal) {
-        console.log(`⚠️  Using fallback IP: ${name} - ${iface.address}`);
-        return iface.address;
-      }
-    }
-  }
-  
-  return 'localhost';
-}
-
-// Create HTTPS server with certificates
-const server = https.createServer({
-  key: fs.readFileSync('./localhost-key.pem'),
-  cert: fs.readFileSync('./localhost.pem')
-}, (req, res) => {
-  res.writeHead(200);
-  res.end('WebSocket Server Running (HTTPS)');
-});
-
-const wss = new WebSocket.Server({ server });
+// --- Configuration ---
+const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+const PORT = process.env.PORT || 3001;
+const HOST = '0.0.0.0'; // Listen on all interfaces
 
 // Store connected clients and rooms
 const clients = new Map();
 const rooms = new Map();
+let server;
 
-// ... rest of your code stays exactly the same ...
-// (All the wss.on, handleJoin, handleSignal, etc.)
+// --- Create Server ---
+// In production, we create a plain HTTP server. Render handles HTTPS.
+// In development, we create an HTTPS server with our self-signed certs.
+if (IS_PRODUCTION) {
+  console.log('Running in PRODUCTION mode (http)...');
+  server = http.createServer((req, res) => {
+    res.writeHead(200);
+    res.end('WebSocket Server Running (HTTP)');
+  });
+} else {
+  console.log('Running in DEVELOPMENT mode (https)...');
+  try {
+    server = https.createServer({
+      key: fs.readFileSync('./localhost-key.pem'),
+      cert: fs.readFileSync('./localhost.pem')
+    }, (req, res) => {
+      res.writeHead(200);
+      res.end('WebSocket Server Running (HTTPS)');
+    });
+  } catch (e) {
+    console.error('\n🔴 FAILED TO START HTTPS SERVER 🔴');
+    console.error('Did you forget to copy "localhost-key.pem" and "localhost.pem" into the /server directory?');
+    console.error('Run `mkcert localhost 127.0.0.1 ::1` and copy the files.\n');
+    process.exit(1);
+  }
+}
+
+const wss = new WebSocket.Server({ server });
+
+// --- WebSocket Logic (Copied from your original file) ---
 
 wss.on('connection', (ws) => {
   console.log('✅ New client connected');
@@ -99,7 +53,6 @@ wss.on('connection', (ws) => {
   ws.on('message', (message) => {
     try {
       const data = JSON.parse(message);
-
       switch (data.type) {
         case 'join':
           handleJoin(ws, data);
@@ -160,7 +113,6 @@ function handleJoin(ws, data) {
   }, ws);
 
   updateUserList(roomId);
-
   console.log(`👤 ${username} joined room: ${roomId}`);
 }
 
@@ -237,24 +189,35 @@ function generateUserId() {
   return Math.random().toString(36).substr(2, 9);
 }
 
-// Listen on all network interfaces (0.0.0.0)
-server.listen(PORT, '0.0.0.0', () => {
+// --- Utility Functions (for logging) ---
+function getLocalIpAddress() {
+  const interfaces = os.networkInterfaces();
+  for (const name of Object.keys(interfaces)) {
+    for (const iface of interfaces[name]) {
+      if (iface.family === 'IPv4' && !iface.internal) {
+        return iface.address;
+      }
+    }
+  }
+  return 'localhost';
+}
+
+// --- Start Server ---
+server.listen(PORT, HOST, () => {
   const localIp = getLocalIpAddress();
+  const protocol = IS_PRODUCTION ? 'http' : 'https';
+  const wsProtocol = IS_PRODUCTION ? 'ws' : 'wss';
   
-  console.log('\n🚀 WebSocket Server Running (HTTPS):\n');
-  console.log(`   ➜  Local:   https://localhost:${PORT}`);
-  console.log(`   ➜  Network: https://${localIp}:${PORT}\n`);
-  console.log('📱 Access from other devices on your WiFi:');
-  console.log(`   Open: https://${localIp}:${PORT}\n`);
-  console.log('✅ Server ready for connections\n');
-  console.log('💡 Note: You may need to accept the self-signed certificate');
-  console.log('   on each device that connects.\n');
+  console.log('\n🚀 WebSocket Server Running:\n');
+  console.log(`   ➜  Mode:    ${IS_PRODUCTION ? 'Production' : 'Development'}`);
+  console.log(`   ➜  Local:   ${protocol}://localhost:${PORT}`);
+  console.log(`   ➜  Network: ${protocol}://${localIp}:${PORT}\n`);
+  console.log(`✅ Server ready for ${wsProtocol} connections\n`);
 });
 
-// Graceful shutdown
-process.on('SIGTERM', () => {
+// --- Graceful Shutdown ---
+function gracefulShutdown() {
   console.log('\n👋 Shutting down gracefully...');
-  
   wss.clients.forEach(client => {
     client.close();
   });
@@ -263,17 +226,7 @@ process.on('SIGTERM', () => {
     console.log('✅ Server closed');
     process.exit(0);
   });
-});
+}
 
-process.on('SIGINT', () => {
-  console.log('\n👋 Shutting down gracefully...');
-  
-  wss.clients.forEach(client => {
-    client.close();
-  });
-  
-  server.close(() => {
-    console.log('✅ Server closed');
-    process.exit(0);
-  });
-});
+process.on('SIGTERM', gracefulShutdown);
+process.on('SIGINT', gracefulShutdown);
